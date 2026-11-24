@@ -1,0 +1,2328 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🏮 ลอยกระทง 3D — Loy Krathong</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: 'Sarabun', sans-serif;
+      touch-action: none;
+    }
+
+    /* ─── LOADING SCREEN ─────────────────────────── */
+    #loading-screen {
+      position: fixed; inset: 0; z-index: 1000;
+      background: radial-gradient(ellipse at 50% 60%, #1a0533 0%, #07090f 70%);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      transition: opacity 1.2s ease;
+    }
+    #loading-screen.fade-out { opacity: 0; pointer-events: none; }
+
+    .ld-ornament {
+      font-size: 4rem;
+      animation: float 3s ease-in-out infinite;
+      filter: drop-shadow(0 0 20px #ff8800);
+      margin-bottom: 10px;
+    }
+    .ld-title {
+      font-size: 2.4rem; font-weight: 600;
+      color: #ffaa44; letter-spacing: 4px;
+      text-shadow: 0 0 25px #ff8800, 0 0 50px #ff4400;
+      animation: glow-pulse 2.5s ease-in-out infinite alternate;
+    }
+    .ld-subtitle {
+      color: rgba(255,245,204,0.65);
+      font-size: 1rem; letter-spacing: 2px;
+      margin: 6px 0 36px;
+    }
+
+    .ld-bar-wrap {
+      width: 280px; height: 3px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 2px; overflow: hidden;
+    }
+    .ld-bar {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #c8720a, #ffcc44);
+      border-radius: 2px; transition: width 0.3s ease;
+      box-shadow: 0 0 12px #ff8800;
+    }
+    .ld-hint {
+      margin-top: 20px;
+      color: rgba(255,245,204,0.4); font-size: 0.85rem;
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    /* decorative dots */
+    .ld-dots { display: flex; gap: 8px; margin-bottom: 28px; }
+    .ld-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #ffaa44;
+      animation: dot-blink 1.4s ease-in-out infinite;
+    }
+    .ld-dot:nth-child(2) { animation-delay: 0.2s; }
+    .ld-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+    @keyframes glow-pulse {
+      from { text-shadow: 0 0 20px #ff8800, 0 0 40px #ff4400; }
+      to   { text-shadow: 0 0 35px #ffcc44, 0 0 70px #ff8800; }
+    }
+    @keyframes blink {
+      0%,100% { opacity: 0.4; }
+      50% { opacity: 0.9; }
+    }
+    @keyframes dot-blink {
+      0%,80%,100% { transform: scale(1); opacity: 0.4; }
+      40% { transform: scale(1.4); opacity: 1; }
+    }
+
+    /* ─── MAIN CANVAS ───────────────────────────── */
+    #canvas-wrap { position: fixed; inset: 0; }
+
+    /* ─── INFO PANEL (top) ───────────────────────── */
+    #info-bar {
+      position: fixed; top: 18px; left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,245,204,0.6); font-size: 0.8rem;
+      letter-spacing: 1px; z-index: 100;
+      text-align: center; pointer-events: none;
+      opacity: 0; transition: opacity 1s ease 1s;
+    }
+    #info-bar.show { opacity: 1; }
+
+    /* ─── BOTTOM UI ──────────────────────────────── */
+    #ui-wrap {
+      position: fixed; bottom: 28px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; flex-direction: column;
+      align-items: center; gap: 10px;
+      z-index: 100;
+      opacity: 0; transition: opacity 1s ease 1.2s;
+    }
+    #ui-wrap.show { opacity: 1; }
+
+    #wish-input {
+      width: 300px; padding: 11px 20px;
+      background: rgba(5, 5, 20, 0.7);
+      border: 1px solid rgba(255,170,68,0.45);
+      border-radius: 30px;
+      color: #fff5cc; font-size: 1rem;
+      font-family: 'Sarabun', sans-serif;
+      text-align: center; outline: none;
+      backdrop-filter: blur(12px);
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    #wish-input::placeholder { color: rgba(255,245,204,0.35); }
+    #wish-input:focus {
+      border-color: rgba(255,170,68,0.9);
+      box-shadow: 0 0 18px rgba(255,136,0,0.35);
+    }
+
+    #release-btn {
+      padding: 12px 44px;
+      background: linear-gradient(135deg, #b8720a 0%, #ffaa44 60%, #ff8800 100%);
+      border: none; border-radius: 30px;
+      color: #fff; font-size: 1.05rem;
+      font-family: 'Sarabun', sans-serif; font-weight: 600;
+      cursor: pointer; letter-spacing: 2px;
+      box-shadow: 0 4px 22px rgba(255,120,0,0.5);
+      transition: transform 0.25s, box-shadow 0.25s, opacity 0.25s;
+    }
+    #release-btn:hover:not(:disabled) {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 32px rgba(255,136,0,0.75);
+    }
+    #release-btn:active:not(:disabled) { transform: scale(0.96); }
+    #release-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    #tour-btn {
+      padding: 12px 20px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255,170,68,0.55);
+      border-radius: 30px;
+      color: #ffe082; font-size: 0.95rem;
+      font-family: 'Sarabun', sans-serif; font-weight: 600;
+      cursor: pointer; letter-spacing: 1px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 4px 18px rgba(0,0,0,0.4);
+      transition: transform 0.25s, box-shadow 0.25s, background 0.25s;
+    }
+    #tour-btn:hover {
+      background: rgba(255,170,68,0.25);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(255,150,0,0.4);
+    }
+
+    /* ─── CONTROLS HINT ──────────────────────────── */
+    #ctrl-hint {
+      position: fixed; bottom: 28px; right: 20px;
+      color: rgba(255,245,204,0.35);
+      font-size: 0.72rem; line-height: 1.6;
+      text-align: right; z-index: 100;
+      pointer-events: none;
+      opacity: 0; transition: opacity 1s ease 2s;
+    }
+    #ctrl-hint.show { opacity: 1; }
+
+    /* ─── FLOATING WISH ──────────────────────────── */
+    .wish-float {
+      position: fixed; z-index: 90;
+      pointer-events: none;
+      color: #ffcc66;
+      font-size: 0.88rem;
+      text-shadow: 0 0 10px #ff8800;
+      animation: wish-rise 5s ease-out forwards;
+    }
+    @keyframes wish-rise {
+      0%   { opacity: 1; transform: translateY(0) scale(1); }
+      70%  { opacity: 0.8; }
+      100% { opacity: 0; transform: translateY(-140px) scale(0.8); }
+    }
+
+    /* ─── FIREWORK FLASH ─────────────────────────── */
+    #flash {
+      position: fixed; inset: 0; z-index: 200;
+      pointer-events: none; opacity: 0;
+      background: radial-gradient(ellipse at 50% 40%,
+        rgba(255,220,100,0.25), transparent 70%);
+      transition: opacity 0.08s ease;
+    }
+
+    /* ─── KRATHONG COUNTER ───────────────────────── */
+    #counter {
+      position: fixed; top: 18px; right: 20px; z-index: 100;
+      color: rgba(255,245,204,0.5); font-size: 0.78rem;
+      opacity: 0; transition: opacity 0.5s;
+    }
+    #counter.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<!-- Loading Screen -->
+<div id="loading-screen">
+  <div class="ld-ornament">🏮</div>
+  <div class="ld-title">ลอยกระทง</div>
+  <div class="ld-subtitle">LOY KRATHONG 3D EXPERIENCE</div>
+  <div class="ld-dots">
+    <div class="ld-dot"></div>
+    <div class="ld-dot"></div>
+    <div class="ld-dot"></div>
+  </div>
+  <div class="ld-bar-wrap">
+    <div class="ld-bar" id="ld-bar"></div>
+  </div>
+  <div class="ld-hint">กำลังโหลดฉากกลางคืนไทย…</div>
+</div>
+
+<!-- Canvas -->
+<div id="canvas-wrap"></div>
+
+<!-- Flash overlay -->
+<div id="flash"></div>
+
+<!-- Top info -->
+<div id="info-bar">🌙 วันลอยกระทง &nbsp;·&nbsp; ลากเพื่อหมุนกล้อง &nbsp;·&nbsp; Scroll เพื่อซูม</div>
+
+<!-- Krathong counter -->
+<div id="counter" title="จำนวนกระทงที่ปล่อย">🏮 <span id="cnt">0</span> กระทง</div>
+
+<!-- Bottom UI -->
+<div id="ui-wrap">
+  <input type="text" id="wish-input"
+    placeholder="✨ เขียนคำอธิษฐาน…" maxlength="50" autocomplete="off">
+  <div style="display:flex; gap:12px; align-items:center;">
+    <button id="release-btn">🏮 &nbsp;ปล่อยกระทง</button>
+    <button id="tour-btn" type="button">🎥 เลื่อนชมวิว: เปิด</button>
+  </div>
+</div>
+
+<!-- Controls hint -->
+<div id="ctrl-hint">
+  🖱 Drag / Touch → หมุนกล้อง<br>
+  🖱 Scroll / Pinch → ซูม<br>
+  ⌨️ W,A,S,D / ลูกศร → เลื่อนเดินชมงาน<br>
+  🎥 ปุ่มล่าง → เปิด/ปิดเลื่อนอัตโนมัติ
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     THREE.JS IMPORT MAP
+════════════════════════════════════════════════════ -->
+<script type="importmap">
+{
+  "imports": {
+    "three":          "https://unpkg.com/three@0.165.0/build/three.module.js",
+    "three/addons/":  "https://unpkg.com/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+
+<!-- ═══════════════════════════════════════════════════
+     MAIN SCENE
+════════════════════════════════════════════════════ -->
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls }     from 'three/addons/controls/OrbitControls.js';
+import { Water }             from 'three/addons/objects/Water.js';
+import { EffectComposer }    from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass }        from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass }   from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass }        from 'three/addons/postprocessing/OutputPass.js';
+
+/* ───────────────────────────────────────────────────
+   DOM REFS
+─────────────────────────────────────────────────── */
+const wrap        = document.getElementById('canvas-wrap');
+const ldBar       = document.getElementById('ld-bar');
+const ldScreen    = document.getElementById('loading-screen');
+const infoBar     = document.getElementById('info-bar');
+const uiWrap      = document.getElementById('ui-wrap');
+const ctrlHint    = document.getElementById('ctrl-hint');
+const releaseBtn  = document.getElementById('release-btn');
+const wishInput   = document.getElementById('wish-input');
+const flashEl     = document.getElementById('flash');
+const counterEl   = document.getElementById('counter');
+const cntEl       = document.getElementById('cnt');
+
+/* ───────────────────────────────────────────────────
+   GLOBALS
+─────────────────────────────────────────────────── */
+let scene, camera, renderer, composer, controls, clock;
+let water, waterFallback = false;
+let starMat;
+let lanternMesh;
+let audioCtx, audioReady = false;
+let krathongReleased = 0;
+
+let heroKrathong = null;
+let heroFlame = null;
+let cruiseBoat = null;
+const driftingKrathongs = [];
+const activeKeys = {};
+
+const lanternData   = [];
+const floatingK     = [];   // user released krathongs
+const candleLights  = [];   // per-krathong lights
+const walkingNPCs   = [];   // animated festival-goers
+const stallAnimators = [];  // market animations
+
+/* ───────────────────────────────────────────────────
+   ENTRY
+─────────────────────────────────────────────────── */
+async function init() {
+  clock = new THREE.Clock();
+  progress(5);
+
+  // ── Renderer (Optimized for rock-solid 60 FPS!) ──
+  renderer = new THREE.WebGLRenderer({
+    antialias: false,
+    powerPreference: 'high-performance',
+    precision: 'mediump'
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  // Pixel ratio 1.0 eliminates Retina 4K/3K fill-rate stutter while maintaining crisp visuals
+  renderer.setPixelRatio(1.0);
+  renderer.shadowMap.enabled   = false; // Disable heavy shadow passes for silky smooth frame rate
+  renderer.toneMapping         = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  renderer.outputColorSpace    = THREE.SRGBColorSpace;
+  wrap.appendChild(renderer.domElement);
+  progress(10);
+
+  // ── Scene ─────────────────────────────────────────
+  scene = new THREE.Scene();
+
+  // ── Camera (Water-level viewpoint matching reference photo!) ──
+  camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 2000);
+  camera.position.set(0.0, 1.35, 4.8);
+
+  // ── Controls ──────────────────────────────────────
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0.0, 0.75, -5.5);
+  controls.maxPolarAngle  = Math.PI / 2 - 0.01;
+  controls.minDistance    = 1.5;
+  controls.maxDistance    = 95;
+  controls.enableDamping  = true;
+  controls.dampingFactor  = 0.08;
+  controls.enablePan      = true;          // Enable smooth panning across the scene
+  controls.screenSpacePanning = true;
+  controls.panSpeed       = 1.3;
+  controls.rotateSpeed    = 0.85;
+  controls.autoRotate     = true;          // Auto-drift/auto-pan cinematic tour!
+  controls.autoRotateSpeed = 0.55;         // Smooth graceful glide
+  controls.update();
+  progress(15);
+
+  // ── Build world (Chao Phraya Loy Krathong Iconic Scene) ──
+  buildLighting();              progress(20);
+  buildSky();                   progress(28);
+  buildStars();                 progress(35);
+  buildMoon();                  progress(42);
+  await buildWater();           progress(52);
+  buildChaoPhrayaRiverside();   progress(64);
+  buildHeroKrathong();          progress(74);
+  buildRama8Bridge();           progress(82);
+  buildThaiCruiseBoat();        progress(88);
+  buildDriftingKrathongField(); progress(94);
+  buildLanterns();              progress(96);
+  buildPostFX();                progress(98);
+  bindEvents();                 progress(100);
+
+  // ── Reveal ────────────────────────────────────────
+  setTimeout(() => {
+    ldScreen.classList.add('fade-out');
+    setTimeout(() => {
+      ldScreen.style.display = 'none';
+      infoBar.classList.add('show');
+      uiWrap.classList.add('show');
+      ctrlHint.classList.add('show');
+      counterEl.classList.add('show');
+    }, 1200);
+  }, 400);
+
+  loop();
+}
+
+/* ───────────────────────────────────────────────────
+   PROGRESS
+─────────────────────────────────────────────────── */
+function progress(v) { ldBar.style.width = v + '%'; }
+
+/* ═══════════════════════════════════════════════════
+   LIGHTING  (Chao Phraya River Night Festival)
+════════════════════════════════════════════════════ */
+function buildLighting() {
+  // Ambient fill — pleasant, clear night ambient
+  scene.add(new THREE.AmbientLight(0x2a3852, 1.15));
+  scene.add(new THREE.HemisphereLight(0x3d4e68, 0x162012, 0.8));
+
+  // Moonlight — gentle silvery moon
+  const moon = new THREE.DirectionalLight(0xfff6e4, 0.95);
+  moon.position.set(-60, 95, -75);
+  moon.castShadow = true;
+  moon.shadow.radius = 2.0;
+  moon.shadow.mapSize.set(1024, 1024);
+  moon.shadow.camera.near   = 10;
+  moon.shadow.camera.far    = 450;
+  const s = 140;
+  moon.shadow.camera.left   = -s;
+  moon.shadow.camera.right  = s;
+  moon.shadow.camera.top    = s;
+  moon.shadow.camera.bottom = -s;
+  moon.shadow.bias          = -0.0001;
+  moon.shadow.normalBias    = 0.003;
+  scene.add(moon);
+
+  // Warm golden illumination for river pier & steps
+  const pierLight = new THREE.PointLight(0xffa726, 2.2, 55, 1.4);
+  pierLight.position.set(-6, 5, -10);
+  scene.add(pierLight);
+  candleLights.push(pierLight);
+
+  // Rama 8 bridge soft floodlight
+  const bridgeLight = new THREE.DirectionalLight(0xffb300, 0.7);
+  bridgeLight.position.set(35, 30, -120);
+  scene.add(bridgeLight);
+}
+
+/* ═══════════════════════════════════════════════════
+   SKY  — custom gradient sphere
+════════════════════════════════════════════════════ */
+function buildSky() {
+  const geo = new THREE.SphereGeometry(900, 32, 16);
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    depthWrite: false,
+    uniforms: {
+      uTop:     { value: new THREE.Color(0x000008) },
+      uMid:     { value: new THREE.Color(0x060810) },
+      uHorizon: { value: new THREE.Color(0x180530) },
+    },
+    vertexShader: /* glsl */`
+      varying float vY;
+      void main() {
+        vY = normalize((modelMatrix * vec4(position,1.0)).xyz).y;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uTop, uMid, uHorizon;
+      varying float vY;
+      void main() {
+        float h = clamp(vY, -0.1, 1.0);
+        vec3 col = mix(uHorizon, uMid,   smoothstep(-0.1, 0.25, h));
+             col = mix(col,      uTop,   smoothstep(0.25, 1.0,  h));
+        gl_FragColor = vec4(col, 1.0);
+      }`
+  });
+  scene.add(new THREE.Mesh(geo, mat));
+}
+
+/* ═══════════════════════════════════════════════════
+   STARS — GPU particle twinkling
+════════════════════════════════════════════════════ */
+function buildStars() {
+  const N = 7000;
+  const pos  = new Float32Array(N * 3);
+  const size = new Float32Array(N);
+  const pha  = new Float32Array(N);
+
+  for (let i = 0; i < N; i++) {
+    const θ = Math.random() * Math.PI * 2;
+    const φ = Math.acos(2 * Math.random() - 1);
+    const r = 650 + Math.random() * 100;
+    pos[i*3]   = r * Math.sin(φ) * Math.cos(θ);
+    pos[i*3+1] = Math.abs(r * Math.cos(φ)) + 10;
+    pos[i*3+2] = r * Math.sin(φ) * Math.sin(θ);
+    size[i] = 0.6 + Math.random() * 2.4;
+    pha[i]  = Math.random() * Math.PI * 2;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,  3));
+  geo.setAttribute('aSize',    new THREE.BufferAttribute(size, 1));
+  geo.setAttribute('aPhase',   new THREE.BufferAttribute(pha,  1));
+
+  starMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uPR:   { value: renderer.getPixelRatio() }
+    },
+    vertexShader: /* glsl */`
+      attribute float aSize;
+      attribute float aPhase;
+      uniform   float uTime, uPR;
+      varying   float vAlpha;
+      void main() {
+        float tw   = sin(uTime * 1.8 + aPhase) * 0.3 + 0.7;
+        vAlpha     = tw;
+        vec4 mv    = modelViewMatrix * vec4(position, 1.0);
+        gl_Position    = projectionMatrix * mv;
+        gl_PointSize   = aSize * uPR * tw * (180.0 / -mv.z);
+      }`,
+    fragmentShader: /* glsl */`
+      varying float vAlpha;
+      void main() {
+        float d = length(gl_PointCoord - 0.5);
+        if (d > 0.5) discard;
+        float a = (1.0 - d * 2.0) * vAlpha;
+        gl_FragColor = vec4(0.88, 0.94, 1.0, a);
+      }`,
+    transparent: true,
+    depthWrite:  false,
+    blending:    THREE.AdditiveBlending
+  });
+
+  scene.add(new THREE.Points(geo, starMat));
+}
+
+/* ═══════════════════════════════════════════════════
+   MOON  (Grand Luminous Full Moon — พระจันทร์เต็มดวง)
+════════════════════════════════════════════════════ */
+function createProceduralMoonTexture() {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  // Base luminous ivory gradient
+  const grad = ctx.createRadialGradient(256, 256, 40, 256, 256, 256);
+  grad.addColorStop(0, '#fffbf0');
+  grad.addColorStop(0.7, '#f8edd4');
+  grad.addColorStop(1, '#ebd7b5');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+
+  // Lunar Maria (Dark seas / rabbit on the moon shapes)
+  ctx.fillStyle = 'rgba(175, 155, 130, 0.28)';
+  const maria = [
+    [180, 160, 75], [260, 140, 60], [330, 190, 85],
+    [210, 260, 95], [290, 290, 80], [170, 320, 60],
+    [320, 350, 50], [250, 210, 70]
+  ];
+  maria.forEach(([mx, my, mr]) => {
+    ctx.beginPath();
+    ctx.arc(mx, my, mr, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Soft fine crater details
+  ctx.fillStyle = 'rgba(140, 120, 100, 0.18)';
+  for (let i = 0; i < 45; i++) {
+    const cx = Math.random() * size;
+    const cy = Math.random() * size;
+    const cr = 6 + Math.random() * 22;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  return tex;
+}
+
+function buildMoon() {
+  const moonTex = createProceduralMoonTexture();
+  const moonGeo = new THREE.SphereGeometry(14, 36, 36);
+  const moonMat = new THREE.MeshStandardMaterial({
+    map: moonTex,
+    color: 0xfffcf0,
+    emissive: 0xffeed0,
+    emissiveMap: moonTex,
+    emissiveIntensity: 0.42,
+    roughness: 0.85,
+    metalness: 0
+  });
+
+  const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+  moonMesh.position.set(-85, 140, -310);
+  scene.add(moonMesh);
+
+  // Soft subtle aura
+  const halo = new THREE.Mesh(
+    new THREE.SphereGeometry(17, 24, 24),
+    new THREE.MeshBasicMaterial({
+      color: 0xffeed0, transparent: true, opacity: 0.05,
+      depthWrite: false, side: THREE.BackSide
+    })
+  );
+  moonMesh.add(halo);
+}
+
+/* ═══════════════════════════════════════════════════
+   WATER  — Three.js Water addon (planar reflection)
+════════════════════════════════════════════════════ */
+function createProceduralWaterNormals() {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.createImageData(size, size);
+  const data = imgData.data;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      const u = (x / size) * Math.PI * 12;
+      const v = (y / size) * Math.PI * 12;
+      const nx = Math.sin(u) * Math.cos(v * 0.8) * 0.45 + Math.sin(u * 2.2 + v * 1.5) * 0.2;
+      const ny = Math.cos(u * 0.7) * Math.sin(v) * 0.45 + Math.cos(u * 1.8 - v * 2.3) * 0.2;
+      data[idx]     = Math.floor((nx * 0.5 + 0.5) * 255);
+      data[idx + 1] = Math.floor((ny * 0.5 + 0.5) * 255);
+      data[idx + 2] = 255;
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+async function buildWater() {
+  // Underlying dark riverbed plane to give depth
+  const riverbed = new THREE.Mesh(
+    new THREE.PlaneGeometry(800, 800),
+    new THREE.MeshStandardMaterial({ color: 0x010810, roughness: 1, metalness: 0 })
+  );
+  riverbed.rotation.x = -Math.PI / 2;
+  riverbed.position.y = -3.5;
+  scene.add(riverbed);
+
+  const initWaterMesh = (normalsTex) => {
+    water = new Water(new THREE.PlaneGeometry(800, 800), {
+      textureWidth:  256, // 4x faster planar reflection pass!
+      textureHeight: 256,
+      waterNormals:  normalsTex,
+      sunDirection:  new THREE.Vector3(-0.3, 0.8, -0.5).normalize(),
+      sunColor:      0x2a3845,
+      waterColor:    0x030c18,
+      distortionScale: 2.2,
+      fog: false
+    });
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = 0.0;
+    water.receiveShadow = false; // Prevents shadow acne on water
+    scene.add(water);
+  };
+
+  return new Promise(resolve => {
+    new THREE.TextureLoader().load(
+      'https://threejs.org/examples/textures/waternormals.jpg',
+      tex => {
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        initWaterMesh(tex);
+        resolve();
+      },
+      undefined,
+      () => {
+        // Instant procedural fallback (works 100% offline and in file://)
+        const procTex = createProceduralWaterNormals();
+        initWaterMesh(procTex);
+        resolve();
+      }
+    );
+  });
+}
+
+/* ═══════════════════════════════════════════════════
+   MASTER FOREGROUND KRATHONG (กระทงเอกประธานมุมกล้องหน้า)
+   Matching the close-up foreground in the reference photo!
+════════════════════════════════════════════════════ */
+function buildHeroKrathong() {
+  const g = new THREE.Group();
+
+  const leafMatDark  = new THREE.MeshStandardMaterial({ color: 0x16420c, roughness: 0.72, metalness: 0.05, side: THREE.DoubleSide });
+  const leafMatLight = new THREE.MeshStandardMaterial({ color: 0x2d7518, roughness: 0.65, metalness: 0.08, side: THREE.DoubleSide });
+  const goldTrimMat  = new THREE.MeshStandardMaterial({ color: 0xffd54f, emissive: 0xb8860b, emissiveIntensity: 0.7, metalness: 0.85, roughness: 0.2 });
+
+  // Flower materials
+  const marigoldOrange = new THREE.MeshStandardMaterial({ color: 0xff6d00, emissive: 0xdd3300, emissiveIntensity: 0.55, roughness: 0.55 });
+  const marigoldYellow = new THREE.MeshStandardMaterial({ color: 0xffc107, emissive: 0xff8f00, emissiveIntensity: 0.65, roughness: 0.5 });
+  const orchidMagenta  = new THREE.MeshStandardMaterial({ color: 0xab47bc, emissive: 0x7b1fa2, emissiveIntensity: 0.5, roughness: 0.45, side: THREE.DoubleSide });
+  const orchidPurple   = new THREE.MeshStandardMaterial({ color: 0x7b1fa2, emissive: 0x4a148c, emissiveIntensity: 0.6, roughness: 0.45, side: THREE.DoubleSide });
+  const orchidWhite    = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+  const lotusPink      = new THREE.MeshStandardMaterial({ color: 0xf48fb1, emissive: 0xec407a, emissiveIntensity: 0.45, roughness: 0.5, side: THREE.DoubleSide });
+
+  // Candle & flame
+  const candleWax = new THREE.MeshStandardMaterial({ color: 0xffeb3b, emissive: 0xfbc02d, emissiveIntensity: 0.35, roughness: 0.45 });
+  const flameMat  = new THREE.MeshStandardMaterial({ color: 0xffbb00, emissive: 0xff3d00, emissiveIntensity: 7.5, transparent: true, opacity: 0.95 });
+  const incenseStickMat = new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.95 });
+  const incenseEmberMat = new THREE.MeshStandardMaterial({ color: 0xff3d00, emissive: 0xff1744, emissiveIntensity: 4.5 });
+
+  // 1. Natural Banana Trunk Base Disc (หยวกกล้วยห่อใบตอง)
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.65, 0.22, 28), leafMatDark);
+  base.position.y = 0.11;
+  base.castShadow = true;
+  g.add(base);
+
+  // 2. Gold braided ribbon rim
+  const goldRibbon = new THREE.Mesh(new THREE.TorusGeometry(0.68, 0.028, 8, 36), goldTrimMat);
+  goldRibbon.rotation.x = Math.PI / 2;
+  goldRibbon.position.y = 0.22;
+  g.add(goldRibbon);
+
+  // 3. Folded Banana Leaf Petals (กลีบใบตองพับจีบวิจิตรศิลป์ 2 ชั้น)
+  // Outer layer: 22 folded petals pointing outward
+  const outerPetals = 22;
+  for (let i = 0; i < outerPetals; i++) {
+    const a = (i / outerPetals) * Math.PI * 2;
+    const pg = new THREE.Group();
+    pg.position.set(Math.cos(a) * 0.66, 0.14, Math.sin(a) * 0.66);
+    pg.rotation.y = -a - Math.PI / 2;
+    pg.rotation.x = 0.38; // Lean outward
+
+    // Folded double-leaf triangular prism
+    const pMesh1 = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.42, 4), leafMatDark);
+    pMesh1.scale.set(1.4, 1.0, 0.35);
+    pMesh1.position.y = 0.18;
+    pMesh1.castShadow = true;
+    pg.add(pMesh1);
+
+    // Tip accent
+    const pMesh2 = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.24, 4), leafMatLight);
+    pMesh2.scale.set(1.3, 1.0, 0.3);
+    pMesh2.position.set(0, 0.22, 0.02);
+    pg.add(pMesh2);
+
+    g.add(pg);
+  }
+
+  // Inner layer: 18 folded petals standing more upright, staggered
+  const innerPetals = 18;
+  for (let i = 0; i < innerPetals; i++) {
+    const a = (i / innerPetals) * Math.PI * 2 + 0.12;
+    const pg = new THREE.Group();
+    pg.position.set(Math.cos(a) * 0.54, 0.18, Math.sin(a) * 0.54);
+    pg.rotation.y = -a - Math.PI / 2;
+    pg.rotation.x = 0.20; // More upright
+
+    const pMesh = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.36, 4), leafMatLight);
+    pMesh.scale.set(1.3, 1.0, 0.32);
+    pMesh.position.y = 0.16;
+    pMesh.castShadow = true;
+    pg.add(pMesh);
+
+    g.add(pg);
+  }
+
+  // 4. Lush Floral Bed (พวงมาลัยดอกไม้สด: ดอกดาวเรืองสีเหลืองทอง ดอกกล้วยไม้สีม่วง ดอกบัวสีชมพู)
+  // Marigolds (ดอกดาวเรืองสดแน่นรอบกระทง)
+  const marigoldPositions = [
+    [0.34, 0.25, 0.0], [-0.34, 0.25, 0.0],
+    [0.0, 0.25, 0.34], [0.0, 0.25, -0.34],
+    [0.24, 0.25, 0.24], [-0.24, 0.25, 0.24],
+    [0.24, 0.25, -0.24], [-0.24, 0.25, -0.24],
+    [0.42, 0.24, 0.18], [-0.42, 0.24, 0.18],
+    [0.18, 0.24, 0.42], [-0.18, 0.24, 0.42]
+  ];
+
+  marigoldPositions.forEach(([mx, my, mz], idx) => {
+    const mg = new THREE.Group();
+    mg.position.set(mx, my, mz);
+    const mMat = (idx % 2 === 0) ? marigoldYellow : marigoldOrange;
+
+    // Ruffled dense bloom
+    for (let p = 0; p < 8; p++) {
+      const pa = (p / 8) * Math.PI * 2;
+      const petal = new THREE.Mesh(new THREE.SphereGeometry(0.065, 6, 6), mMat);
+      petal.scale.set(1.1, 0.6, 1.1);
+      petal.position.set(Math.cos(pa) * 0.045, 0, Math.sin(pa) * 0.045);
+      mg.add(petal);
+    }
+    const center = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), marigoldOrange);
+    center.position.y = 0.03;
+    mg.add(center);
+    g.add(mg);
+  });
+
+  // Orchids (ดอกกล้วยไม้สีม่วงและชมพูบานสะพรั่ง)
+  const orchidPositions = [
+    [0.26, 0.28, 0.12, 0.3], [-0.26, 0.28, 0.12, -0.3],
+    [0.12, 0.28, -0.26, 2.2], [-0.12, 0.28, -0.26, -2.2],
+    [0.32, 0.27, -0.15, 1.1], [-0.32, 0.27, -0.15, -1.1]
+  ];
+
+  orchidPositions.forEach(([ox, oy, oz, rot]) => {
+    const og = new THREE.Group();
+    og.position.set(ox, oy, oz);
+    og.rotation.y = rot;
+    og.rotation.x = -0.25;
+
+    // 5 orchid petals
+    for (let p = 0; p < 5; p++) {
+      const pa = (p / 5) * Math.PI * 2;
+      const petal = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.16, 4), (p % 2 === 0) ? orchidMagenta : orchidPurple);
+      petal.scale.set(1.2, 1.0, 0.2);
+      petal.position.set(Math.cos(pa) * 0.07, 0, Math.sin(pa) * 0.07);
+      petal.rotation.z = Math.PI;
+      petal.rotation.y = pa;
+      og.add(petal);
+    }
+    // White throat center
+    const center = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), orchidWhite);
+    center.position.y = 0.01;
+    og.add(center);
+
+    g.add(og);
+  });
+
+  // Lotus Petals (กลีบดอกบัวสีชมพูประดับแทรก)
+  for (let lp = 0; lp < 6; lp++) {
+    const la = (lp / 6) * Math.PI * 2 + 0.35;
+    const lotus = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.22, 4), lotusPink);
+    lotus.scale.set(1.3, 1.0, 0.25);
+    lotus.position.set(Math.cos(la) * 0.40, 0.27, Math.sin(la) * 0.40);
+    lotus.rotation.set(0.35, la, 0);
+    g.add(lotus);
+  }
+
+  // 5. Ritual Candle (เทียนสีเหลืองแท่งสง่างามตรงกลาง)
+  const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.058, 0.65, 12), candleWax);
+  candle.position.set(0, 0.54, 0);
+  candle.castShadow = true;
+  g.add(candle);
+
+  // Melted wax drip lip
+  const candleLip = new THREE.Mesh(new THREE.TorusGeometry(0.056, 0.015, 6, 14), candleWax);
+  candleLip.rotation.x = Math.PI / 2;
+  candleLip.position.set(0, 0.86, 0);
+  g.add(candleLip);
+
+  // Wick
+  const wick = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.08, 4), incenseStickMat);
+  wick.position.set(0, 0.89, 0);
+  g.add(wick);
+
+  // Luminous Teardrop Flame (เปลวเทียนระยับทอง)
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.26, 8), flameMat);
+  flame.position.set(0, 1.03, 0);
+  g.add(flame);
+
+  // Inner super-bright core
+  const flameCore = new THREE.Mesh(
+    new THREE.ConeGeometry(0.028, 0.16, 6),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  flameCore.position.set(0, 0.98, 0);
+  g.add(flameCore);
+
+  // Dedicated Master Candle PointLight
+  const heroLight = new THREE.PointLight(0xffa726, 3.8, 12, 1.4);
+  heroLight.position.set(0, 1.15, 0);
+  g.add(heroLight);
+  candleLights.push(heroLight);
+
+  // 6. Incense Sticks (ธูป 3 ดอก พร้อมจุดไฟปลายแดง)
+  const incenseAngles = [-0.14, 0.0, 0.14];
+  incenseAngles.forEach((offset, idx) => {
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.85, 4), incenseStickMat);
+    stick.position.set(-0.08 + offset * 0.4, 0.68, -0.09);
+    stick.rotation.z = offset * 0.6;
+    stick.rotation.x = -0.15;
+    g.add(stick);
+
+    const ember = new THREE.Mesh(new THREE.SphereGeometry(0.018, 5, 5), incenseEmberMat);
+    ember.position.set(-0.08 + offset * 0.7, 1.10, -0.16);
+    g.add(ember);
+  });
+
+  g.position.set(0.0, 0.08, 2.2);
+  g.scale.setScalar(1.25);
+  scene.add(g);
+
+  heroKrathong = g;
+  heroFlame = flame;
+}
+
+/* ═══════════════════════════════════════════════════
+   CHAO PHRAYA RIVERSIDE PROMENADE & STONE STEPS
+   (ท่าน้ำริมแม่น้ำเจ้าพระยา บันไดหิน โคมไฟวินเทจ และผู้คนลอยกระทง)
+════════════════════════════════════════════════════ */
+function buildChaoPhrayaRiverside() {
+  const graniteDark  = new THREE.MeshStandardMaterial({ color: 0x242426, roughness: 0.88, metalness: 0.1 });
+  const graniteStep  = new THREE.MeshStandardMaterial({ color: 0x363432, roughness: 0.82, metalness: 0.08 });
+  const wetStoneMat  = new THREE.MeshStandardMaterial({ color: 0x1e1e1e, roughness: 0.35, metalness: 0.2 });
+  const lampPoleMat  = new THREE.MeshStandardMaterial({ color: 0x1b1f24, roughness: 0.5, metalness: 0.75 });
+  const lampGlobeMat = new THREE.MeshStandardMaterial({
+    color: 0xffe082, emissive: 0xffa000, emissiveIntensity: 3.2, transparent: true, opacity: 0.95
+  });
+
+  // 1. Broad Upper Waterfront Promenade
+  const promenade = new THREE.Mesh(new THREE.BoxGeometry(32, 4.0, 200), graniteDark);
+  promenade.position.set(-24, 0.4, -20);
+  promenade.receiveShadow = promenade.castShadow = true;
+  scene.add(promenade);
+
+  // 2. Wide Stone Steps Descending into River
+  const steps = [
+    { x: -9.8, y: 2.10, w: 1.6, h: 0.35, d: 90, mat: graniteStep },
+    { x: -8.4, y: 1.75, w: 1.6, h: 0.35, d: 90, mat: graniteStep },
+    { x: -7.0, y: 1.40, w: 1.6, h: 0.35, d: 90, mat: graniteStep },
+    { x: -5.7, y: 1.05, w: 1.6, h: 0.35, d: 90, mat: graniteStep },
+    { x: -4.5, y: 0.70, w: 1.6, h: 0.35, d: 90, mat: graniteStep },
+    { x: -3.5, y: 0.35, w: 1.6, h: 0.35, d: 90, mat: graniteStep },
+    { x: -2.6, y: 0.06, w: 1.6, h: 0.28, d: 90, mat: wetStoneMat }
+  ];
+
+  steps.forEach(s => {
+    const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(s.w, s.h, s.d), s.mat);
+    stepMesh.position.set(s.x, s.y, -15);
+    stepMesh.receiveShadow = stepMesh.castShadow = true;
+    scene.add(stepMesh);
+  });
+
+  // 3. Vintage Colonial Streetlamps
+  const lampZPositions = [12, 2, -8, -18, -28, -38, -48, -60];
+  lampZPositions.forEach(lz => {
+    const lg = new THREE.Group();
+    lg.position.set(-6.8, 1.4, lz);
+
+    const baseBox = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.9, 0.7), graniteDark);
+    baseBox.position.y = 0.45;
+    baseBox.castShadow = true;
+    lg.add(baseBox);
+
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 3.4, 8), lampPoleMat);
+    post.position.y = 2.6;
+    post.castShadow = true;
+    lg.add(post);
+
+    const bracket = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.03, 6, 12, Math.PI), lampPoleMat);
+    bracket.position.set(0, 4.3, 0);
+    bracket.rotation.z = Math.PI / 2;
+    lg.add(bracket);
+
+    const globe = new THREE.Mesh(new THREE.SphereGeometry(0.36, 16, 16), lampGlobeMat);
+    globe.position.y = 4.6;
+    lg.add(globe);
+
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.22, 8), lampPoleMat);
+    cap.position.y = 5.0;
+    lg.add(cap);
+
+    const pl = new THREE.PointLight(0xffa726, 2.6, 24, 1.5);
+    pl.position.y = 4.7;
+    lg.add(pl);
+    candleLights.push(pl);
+
+    scene.add(lg);
+  });
+
+  buildRiversideFairyLights(lampZPositions);
+  buildPeopleOnStairs();
+  buildUpperNightMarket();
+}
+
+function buildRiversideFairyLights(zPoints) {
+  const bulbColors = [0xffd54f, 0xff7043, 0x4dd0e1, 0x81c784, 0xff4081, 0xffeb3b];
+  for (let i = 0; i < zPoints.length - 1; i++) {
+    const z1 = zPoints[i];
+    const z2 = zPoints[i + 1];
+    const bulbs = 8;
+    for (let b = 0; b < bulbs; b++) {
+      const f = b / (bulbs - 1);
+      const bz = z1 + (z2 - z1) * f;
+      const sag = Math.sin(f * Math.PI) * 0.75;
+      const by = 1.4 + 4.6 - sag;
+
+      const col = bulbColors[(i * bulbs + b) % bulbColors.length];
+      const bulb = new THREE.Mesh(
+        new THREE.SphereGeometry(0.11, 8, 8),
+        new THREE.MeshStandardMaterial({
+          color: col, emissive: col, emissiveIntensity: 3.2, transparent: true, opacity: 0.95
+        })
+      );
+      bulb.position.set(-6.8, by, bz);
+      scene.add(bulb);
+    }
+  }
+}
+
+function buildPeopleOnStairs() {
+  const heroGirl = buildHeroGirlKneeling();
+  heroGirl.position.set(-3.7, 0.28, -1.2);
+  heroGirl.rotation.y = 0.55;
+  scene.add(heroGirl);
+
+  const { group: handsK } = makeKrathong(new THREE.Vector3(-2.8, 0.12, -0.9));
+  handsK.scale.setScalar(0.55);
+
+  const thaiMaiden = buildThaiMaidenKneeling();
+  thaiMaiden.position.set(-4.0, 0.35, -7.5);
+  thaiMaiden.rotation.y = 0.45;
+  scene.add(thaiMaiden);
+
+  const { group: maidenK } = makeKrathong(new THREE.Vector3(-3.0, 0.12, -7.2));
+  maidenK.scale.setScalar(0.5);
+
+  const seatedBoy = buildSeatedVisitor({ skin: 0xd49466, shirt: 0x1976d2, pants: 0x263238, hair: 0x111111 });
+  seatedBoy.position.set(-6.2, 1.15, -14.5);
+  seatedBoy.rotation.y = 0.8;
+  scene.add(seatedBoy);
+
+  const seatedGirl = buildSeatedVisitor({ skin: 0xfff0ea, shirt: 0xf06292, pants: 0xffffff, hair: 0x3e2723 });
+  seatedGirl.position.set(-6.0, 1.15, -13.5);
+  seatedGirl.rotation.y = 0.7;
+  scene.add(seatedGirl);
+
+  const upstreamVisitor = buildSeatedVisitor({ skin: 0xdeb887, shirt: 0xffb300, pants: 0x37474f, hair: 0x1a1a1a });
+  upstreamVisitor.position.set(-4.2, 0.40, 5.5);
+  upstreamVisitor.rotation.y = 0.5;
+  scene.add(upstreamVisitor);
+
+  const { group: upK } = makeKrathong(new THREE.Vector3(-3.2, 0.12, 5.8));
+  upK.scale.setScalar(0.48);
+}
+
+function buildHeroGirlKneeling() {
+  const g = new THREE.Group();
+
+  const skinMat    = new THREE.MeshStandardMaterial({ color: 0xfff5ef, roughness: 0.55 });
+  const blushMat   = new THREE.MeshBasicMaterial({ color: 0xff8ca0, transparent: true, opacity: 0.65 });
+  const noseBlush  = new THREE.MeshBasicMaterial({ color: 0xffa0b4, transparent: true, opacity: 0.5 });
+  const lipMat     = new THREE.MeshStandardMaterial({ color: 0xff557c, roughness: 0.25 });
+  const eyeMat     = new THREE.MeshStandardMaterial({ color: 0x1a1518, roughness: 0.2 });
+  const eyeGlint   = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const silverHair = new THREE.MeshStandardMaterial({ color: 0xf5f8fc, roughness: 0.35, metalness: 0.18 });
+  const topMat     = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 });
+  const pinkTop    = new THREE.MeshStandardMaterial({ color: 0xf8bbd0, roughness: 0.65 });
+  const skirtMat   = new THREE.MeshStandardMaterial({ color: 0xfce4ec, roughness: 0.7 });
+  const bunnyMat   = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 });
+  const bunnyEar   = new THREE.MeshStandardMaterial({ color: 0xff80ab, roughness: 0.7 });
+  const pinPurple  = new THREE.MeshStandardMaterial({ color: 0xba68c8, emissive: 0x8e24aa, emissiveIntensity: 0.6 });
+  const pinYellow  = new THREE.MeshStandardMaterial({ color: 0xffeb3b, emissive: 0xfbc02d, emissiveIntensity: 0.6 });
+
+  const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.65, 12), skirtMat);
+  skirt.position.set(0, 0.3, 0);
+  skirt.castShadow = true;
+  g.add(skirt);
+
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.22, 0.62, 10), topMat);
+  torso.position.set(0, 0.72, 0);
+  torso.castShadow = true;
+  g.add(torso);
+
+  const pinkHem = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.25, 0.14, 10), pinkTop);
+  pinkHem.position.set(0, 0.48, 0);
+  g.add(pinkHem);
+
+  const strap = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.1, 4), pinkTop);
+  strap.position.set(-0.14, 0.62, 0.16);
+  strap.rotation.z = -0.55;
+  g.add(strap);
+
+  const bunny = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), bunnyMat);
+  bunny.position.set(-0.22, 0.45, 0.20);
+  g.add(bunny);
+
+  const bEar1 = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.09, 5), bunnyEar);
+  bEar1.position.set(-0.24, 0.54, 0.20);
+  g.add(bEar1);
+  const bEar2 = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.09, 5), bunnyEar);
+  bEar2.position.set(-0.20, 0.54, 0.20);
+  g.add(bEar2);
+
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.18, 8), skinMat);
+  neck.position.set(0, 1.08, 0);
+  g.add(neck);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 16, 14), skinMat);
+  head.scale.set(0.95, 1.05, 0.96);
+  head.position.set(0, 1.30, 0);
+  head.castShadow = true;
+  g.add(head);
+
+  const blushL = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), blushMat);
+  blushL.scale.set(1.2, 0.7, 0.3);
+  blushL.position.set(-0.11, 1.25, 0.16);
+  g.add(blushL);
+  const blushR = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), blushMat);
+  blushR.scale.set(1.2, 0.7, 0.3);
+  blushR.position.set(0.11, 1.25, 0.16);
+  g.add(blushR);
+
+  const nBlush = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 6), noseBlush);
+  nBlush.position.set(0, 1.27, 0.20);
+  g.add(nBlush);
+
+  const lips = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.02, 0.025), lipMat);
+  lips.position.set(0, 1.19, 0.19);
+  g.add(lips);
+
+  const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.032, 6, 6), eyeMat);
+  eyeL.scale.set(1.1, 0.8, 0.4);
+  eyeL.position.set(-0.075, 1.32, 0.18);
+  g.add(eyeL);
+  const glintL = new THREE.Mesh(new THREE.SphereGeometry(0.01, 4, 4), eyeGlint);
+  glintL.position.set(-0.065, 1.335, 0.195);
+  g.add(glintL);
+
+  const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.032, 6, 6), eyeMat);
+  eyeR.scale.set(1.1, 0.8, 0.4);
+  eyeR.position.set(0.075, 1.32, 0.18);
+  g.add(eyeR);
+  const glintR = new THREE.Mesh(new THREE.SphereGeometry(0.01, 4, 4), eyeGlint);
+  glintR.position.set(0.085, 1.335, 0.195);
+  g.add(glintR);
+
+  const hairDome = new THREE.Mesh(new THREE.SphereGeometry(0.23, 14, 12), silverHair);
+  hairDome.position.set(0, 1.33, -0.02);
+  hairDome.scale.set(1.02, 1.05, 1.05);
+  g.add(hairDome);
+
+  for (let b = -2; b <= 2; b++) {
+    const strand = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.008, 0.18, 5), silverHair);
+    strand.position.set(b * 0.04, 1.37, 0.19);
+    strand.rotation.x = 0.3;
+    g.add(strand);
+  }
+
+  for (let s = -2; s <= 2; s++) {
+    const strand = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.018, 1.1, 6), silverHair);
+    strand.position.set(s * 0.06, 0.85, -0.10 - Math.abs(s) * 0.03);
+    strand.rotation.x = -0.15;
+    g.add(strand);
+  }
+
+  const pin1 = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.02, 5), pinPurple);
+  pin1.position.set(-0.16, 1.45, 0.12);
+  g.add(pin1);
+  const pin2 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.01, 0.01), pinYellow);
+  pin2.position.set(0.15, 1.46, 0.13);
+  g.add(pin2);
+
+  const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.035, 0.55, 6), skinMat);
+  armL.position.set(-0.24, 0.62, 0.28);
+  armL.rotation.set(0.85, -0.3, 0);
+  g.add(armL);
+
+  const armR = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.035, 0.55, 6), skinMat);
+  armR.position.set(0.24, 0.62, 0.28);
+  armR.rotation.set(0.85, 0.3, 0);
+  g.add(armR);
+
+  const glow = new THREE.PointLight(0xffb888, 1.8, 6, 2);
+  glow.position.set(0, 0.8, 0.5);
+  g.add(glow);
+
+  g.scale.setScalar(0.95);
+  return g;
+}
+
+function buildThaiMaidenKneeling() {
+  const g = new THREE.Group();
+  const skinMat = new THREE.MeshStandardMaterial({ color: 0xdeb887, roughness: 0.7 });
+  const silkMat = new THREE.MeshStandardMaterial({ color: 0xe91e63, emissive: 0x880e4f, emissiveIntensity: 0.35, roughness: 0.6 });
+  const goldSabai = new THREE.MeshStandardMaterial({ color: 0xffd54f, emissive: 0xb8860b, emissiveIntensity: 0.5, metalness: 0.7, roughness: 0.3 });
+  const hairMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.9 });
+
+  const sarong = new THREE.Mesh(new THREE.ConeGeometry(0.40, 0.68, 10), silkMat);
+  sarong.position.y = 0.32;
+  g.add(sarong);
+
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.60, 8), silkMat);
+  torso.position.y = 0.75;
+  g.add(torso);
+
+  const sabai = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.65, 0.26), goldSabai);
+  sabai.position.set(0.08, 0.75, 0.02);
+  sabai.rotation.z = 0.3;
+  g.add(sabai);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.20, 12, 10), skinMat);
+  head.position.y = 1.30;
+  g.add(head);
+
+  const bun = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), hairMat);
+  bun.position.set(0, 1.48, -0.08);
+  g.add(bun);
+
+  const garland = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.025, 6, 16),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 }));
+  garland.position.set(0, 1.44, -0.08);
+  garland.rotation.x = Math.PI / 2;
+  g.add(garland);
+
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.52, 6), skinMat);
+  arm.position.set(0.18, 0.62, 0.25);
+  arm.rotation.set(0.8, 0.2, 0);
+  g.add(arm);
+
+  g.scale.setScalar(0.92);
+  return g;
+}
+
+function buildSeatedVisitor({ skin, shirt, pants, hair }) {
+  const g = new THREE.Group();
+  const skinMat  = new THREE.MeshStandardMaterial({ color: skin,  roughness: 0.8 });
+  const shirtMat = new THREE.MeshStandardMaterial({ color: shirt, roughness: 0.7 });
+  const pantsMat = new THREE.MeshStandardMaterial({ color: pants, roughness: 0.75 });
+  const hairMat  = new THREE.MeshStandardMaterial({ color: hair,  roughness: 0.9 });
+
+  const thighs = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.22, 0.55), pantsMat);
+  thighs.position.set(0, 0.12, 0.2);
+  g.add(thighs);
+
+  const calves = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.38, 0.2), pantsMat);
+  calves.position.set(0, -0.15, 0.45);
+  g.add(calves);
+
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.65, 0.26), shirtMat);
+  torso.position.set(0, 0.55, 0.05);
+  g.add(torso);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.20, 10, 8), skinMat);
+  head.position.set(0, 1.10, 0.05);
+  g.add(head);
+
+  const hairMesh = new THREE.Mesh(new THREE.SphereGeometry(0.21, 8, 6), hairMat);
+  hairMesh.position.set(0, 1.14, 0.02);
+  g.add(hairMesh);
+
+  return g;
+}
+
+function buildUpperNightMarket() {
+  const woodMat   = new THREE.MeshStandardMaterial({ color: 0x3d2714, roughness: 0.85 });
+  const bambooMat = new THREE.MeshStandardMaterial({ color: 0x8a7042, roughness: 0.7 });
+
+  const stalls = [
+    { name: "ร้านผัดไทยกุ้งสด", z: -36, c1: 0xff6f00, c2: 0xffeb3b },
+    { name: "ร้านลูกชิ้นปิ้งเตาถ่าน", z: -22, c1: 0xd32f2f, c2: 0xfbc02d },
+    { name: "ร้านขนมครกชาววัง", z: -8, c1: 0x2e7d32, c2: 0xfafafa },
+    { name: "ร้านชาไทยเย็น & น้ำผลไม้", z: 6, c1: 0xf57c00, c2: 0xffffff },
+    { name: "ร้านข้าวเหนียวมะม่วง", z: 20, c1: 0xfbc02d, c2: 0x388e3c },
+    { name: "ร้านกระทงดอกไม้ & โคมลอย", z: 34, c1: 0x1976d2, c2: 0xffd54f }
+  ];
+
+  stalls.forEach(s => {
+    const sg = new THREE.Group();
+    sg.position.set(-17.5, 2.4, s.z);
+    sg.rotation.y = Math.PI / 2;
+
+    const table = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.1, 4.2), woodMat);
+    table.position.y = 0.55;
+    sg.add(table);
+
+    [[-1.0, -1.9], [-1.0, 1.9], [1.0, -1.9], [1.0, 1.9]].forEach(([px, pz]) => {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.6, 6), bambooMat);
+      pole.position.set(px, 1.3, pz);
+      sg.add(pole);
+    });
+
+    const roof = new THREE.Group();
+    roof.position.y = 2.5;
+    for (let i = 0; i < 7; i++) {
+      const col = (i % 2 === 0) ? s.c1 : s.c2;
+      const roofSeg = new THREE.Mesh(
+        new THREE.ConeGeometry(1.6, 0.7, 4),
+        new THREE.MeshStandardMaterial({ color: col, roughness: 0.65, side: THREE.DoubleSide })
+      );
+      roofSeg.scale.set(0.9, 0.7, 4.4 / 7 / 1.4);
+      roofSeg.position.set(0, 0, -2.2 + (i + 0.5) * (4.4 / 7));
+      roofSeg.rotation.y = Math.PI / 4;
+      roof.add(roofSeg);
+    }
+    sg.add(roof);
+
+    const stallLight = new THREE.PointLight(0xffa044, 1.6, 14, 1.8);
+    stallLight.position.set(0, 2.1, 0);
+    sg.add(stallLight);
+    candleLights.push(stallLight);
+
+    const vendor = createVendorCharacter({ shirt: s.c1, apron: 0xffffff });
+    vendor.position.set(0.9, 0, 0);
+    vendor.rotation.y = -Math.PI / 2;
+    sg.add(vendor);
+
+    scene.add(sg);
+  });
+
+  buildRiversideWalkingNPCs();
+}
+
+function createVendorCharacter({ shirt, apron }) {
+  const g = new THREE.Group();
+  const skinMat  = new THREE.MeshStandardMaterial({ color: 0xd29062, roughness: 0.8 });
+  const shirtMat = new THREE.MeshStandardMaterial({ color: shirt, roughness: 0.7 });
+  const apronMat = new THREE.MeshStandardMaterial({ color: apron, roughness: 0.75 });
+  const hairMat  = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 1.2, 8), shirtMat);
+  body.position.y = 0.9;
+  body.castShadow = true;
+  g.add(body);
+
+  const ap = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.75, 0.12), apronMat);
+  ap.position.set(0, 0.75, 0.24);
+  g.add(ap);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), skinMat);
+  head.position.y = 1.7;
+  head.castShadow = true;
+  g.add(head);
+
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.21, 8, 6), hairMat);
+  hair.position.set(0, 1.75, -0.02);
+  g.add(hair);
+
+  const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.6, 6), skinMat);
+  armL.position.set(-0.35, 1.1, 0.15);
+  armL.rotation.x = 0.5;
+  g.add(armL);
+
+  const armR = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.6, 6), skinMat);
+  armR.position.set(0.35, 1.1, 0.15);
+  armR.rotation.x = 0.5;
+  g.add(armR);
+
+  return g;
+}
+
+function buildRiversideWalkingNPCs() {
+  const configs = [
+    {
+      skin: 0xfff0ea, shirt: 0x212121, pants: 0xe0e0e0, hair: 0xf48fb1,
+      scale: 0.94, startX: -13.5, startZ: -28, minZ: -45, maxZ: 40,
+      speed: 2.6, strideRate: 6.4, phaseOffset: 0.5, dir: 1
+    },
+    {
+      skin: 0xfff5f0, shirt: 0xffffff, pants: 0xf8bbd0, hair: 0x1a1a1a,
+      scale: 0.93, startX: -14.2, startZ: 25, minZ: -40, maxZ: 42,
+      speed: 2.4, strideRate: 6.0, phaseOffset: 2.8, dir: -1
+    },
+    {
+      skin: 0xd49466, shirt: 0x4a90e2, pants: 0x333333, hair: 0x0a0a0a,
+      scale: 1.0, startX: -13.8, startZ: -10, minZ: -42, maxZ: 38,
+      speed: 2.9, strideRate: 6.6, phaseOffset: 0.0, dir: 1
+    }
+  ];
+
+  configs.forEach(cfg => {
+    const npc = createHumanoidNPC(cfg);
+    npc.root.position.y = 2.4;
+    walkingNPCs.push(npc);
+    scene.add(npc.root);
+  });
+}
+
+function createHumanoidNPC(cfg) {
+  const root = new THREE.Group();
+  root.position.set(cfg.startX, 2.4, cfg.startZ);
+  if (cfg.dir < 0) root.rotation.y = Math.PI;
+
+  const skinMat  = new THREE.MeshStandardMaterial({ color: cfg.skin,  roughness: 0.8 });
+  const shirtMat = new THREE.MeshStandardMaterial({ color: cfg.shirt, roughness: 0.7 });
+  const pantsMat = new THREE.MeshStandardMaterial({ color: cfg.pants, roughness: 0.75 });
+  const hairMat  = new THREE.MeshStandardMaterial({ color: cfg.hair,  roughness: 0.9 });
+
+  const sc = cfg.scale;
+
+  const hips = new THREE.Group();
+  hips.position.y = 0.95 * sc;
+  root.add(hips);
+
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.46 * sc, 0.62 * sc, 0.28 * sc), shirtMat);
+  torso.position.y = 0.42 * sc;
+  torso.castShadow = true;
+  hips.add(torso);
+
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * sc, 0.1 * sc, 0.14 * sc, 6), skinMat);
+  neck.position.y = 0.78 * sc;
+  hips.add(neck);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.21 * sc, 10, 8), skinMat);
+  head.position.y = 0.98 * sc;
+  head.castShadow = true;
+  hips.add(head);
+
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.225 * sc, 8, 6), hairMat);
+  hair.position.set(0, 1.02 * sc, -0.02 * sc);
+  hair.scale.set(1, 0.92, 1.05);
+  hips.add(hair);
+
+  const leftLeg = new THREE.Group();
+  leftLeg.position.set(-0.14 * sc, 0, 0);
+  hips.add(leftLeg);
+
+  const leftThigh = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * sc, 0.085 * sc, 0.46 * sc, 6), pantsMat);
+  leftThigh.position.y = -0.23 * sc;
+  leftThigh.castShadow = true;
+  leftLeg.add(leftThigh);
+
+  const leftCalf = new THREE.Group();
+  leftCalf.position.y = -0.46 * sc;
+  leftLeg.add(leftCalf);
+
+  const leftLower = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * sc, 0.07 * sc, 0.44 * sc, 6), skinMat);
+  leftLower.position.y = -0.22 * sc;
+  leftCalf.add(leftLower);
+
+  const leftFoot = new THREE.Mesh(new THREE.BoxGeometry(0.12 * sc, 0.08 * sc, 0.24 * sc), pantsMat);
+  leftFoot.position.set(0, -0.44 * sc, 0.05 * sc);
+  leftCalf.add(leftFoot);
+
+  const rightLeg = new THREE.Group();
+  rightLeg.position.set(0.14 * sc, 0, 0);
+  hips.add(rightLeg);
+
+  const rightThigh = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * sc, 0.085 * sc, 0.46 * sc, 6), pantsMat);
+  rightThigh.position.y = -0.23 * sc;
+  rightThigh.castShadow = true;
+  rightLeg.add(rightThigh);
+
+  const rightCalf = new THREE.Group();
+  rightCalf.position.y = -0.46 * sc;
+  rightLeg.add(rightCalf);
+
+  const rightLower = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * sc, 0.07 * sc, 0.44 * sc, 6), skinMat);
+  rightLower.position.y = -0.22 * sc;
+  rightCalf.add(rightLower);
+
+  const rightFoot = new THREE.Mesh(new THREE.BoxGeometry(0.12 * sc, 0.08 * sc, 0.24 * sc), pantsMat);
+  rightFoot.position.set(0, -0.44 * sc, 0.05 * sc);
+  rightCalf.add(rightFoot);
+
+  const leftArm = new THREE.Group();
+  leftArm.position.set(-0.31 * sc, 0.65 * sc, 0);
+  hips.add(leftArm);
+
+  const leftUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.075 * sc, 0.065 * sc, 0.36 * sc, 5), shirtMat);
+  leftUpperArm.position.y = -0.18 * sc;
+  leftUpperArm.castShadow = true;
+  leftArm.add(leftUpperArm);
+
+  const leftForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * sc, 0.055 * sc, 0.34 * sc, 5), skinMat);
+  leftForearm.position.y = -0.5 * sc;
+  leftArm.add(leftForearm);
+
+  const rightArm = new THREE.Group();
+  rightArm.position.set(0.31 * sc, 0.65 * sc, 0);
+  hips.add(rightArm);
+
+  const rightUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.075 * sc, 0.065 * sc, 0.36 * sc, 5), shirtMat);
+  rightUpperArm.position.y = -0.18 * sc;
+  rightUpperArm.castShadow = true;
+  rightArm.add(rightUpperArm);
+
+  const rightForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * sc, 0.055 * sc, 0.34 * sc, 5), skinMat);
+  rightForearm.position.y = -0.5 * sc;
+  rightArm.add(rightForearm);
+
+  return {
+    root, hips, head,
+    leftLeg, leftCalf,
+    rightLeg, rightCalf,
+    leftArm, rightArm,
+    scale: sc,
+    speed: cfg.speed,
+    dir: cfg.dir,
+    minZ: cfg.minZ,
+    maxZ: cfg.maxZ,
+    strideRate: cfg.strideRate,
+    phaseOffset: cfg.phaseOffset
+  };
+}
+
+/* ═══════════════════════════════════════════════════
+   RAMA VIII BRIDGE  (สะพานพระราม 8 สีทองอร่าม)
+   Matches the golden cable-stayed bridge in the reference photo!
+════════════════════════════════════════════════════ */
+function buildRama8Bridge() {
+  const bridgeGroup = new THREE.Group();
+  bridgeGroup.position.set(28, 0, -125);
+
+  const goldPylonMat = new THREE.MeshStandardMaterial({
+    color: 0xffc107,
+    emissive: 0xd49200,
+    emissiveIntensity: 0.35,
+    metalness: 0.85,
+    roughness: 0.22
+  });
+  const goldCableMat = new THREE.MeshStandardMaterial({
+    color: 0xffea00,
+    emissive: 0xffa000,
+    emissiveIntensity: 0.45,
+    metalness: 0.9,
+    roughness: 0.15
+  });
+  const deckMat = new THREE.MeshStandardMaterial({
+    color: 0x212529,
+    roughness: 0.85,
+    metalness: 0.2
+  });
+  const lightBeadMat = new THREE.MeshStandardMaterial({
+    color: 0xffea00,
+    emissive: 0xffa000,
+    emissiveIntensity: 0.75,
+    transparent: true,
+    opacity: 0.95
+  });
+
+  const foundation = new THREE.Mesh(new THREE.BoxGeometry(10, 4, 16), deckMat);
+  foundation.position.set(0, 1.2, 0);
+  bridgeGroup.add(foundation);
+
+  const legL = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.4, 38, 8), goldPylonMat);
+  legL.position.set(-4.2, 18, 0);
+  legL.rotation.z = -0.21;
+  bridgeGroup.add(legL);
+
+  const legR = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.4, 38, 8), goldPylonMat);
+  legR.position.set(4.2, 18, 0);
+  legR.rotation.z = 0.21;
+  bridgeGroup.add(legR);
+
+  const spireH = 36;
+  const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 2.2, spireH, 8), goldPylonMat);
+  spire.position.set(0, 34 + spireH * 0.5, 0);
+  bridgeGroup.add(spire);
+
+  const crown = new THREE.Mesh(new THREE.ConeGeometry(1.2, 5, 8), goldPylonMat);
+  crown.position.set(0, 34 + spireH + 2.5, 0);
+  bridgeGroup.add(crown);
+
+  const beacon = new THREE.Mesh(
+    new THREE.SphereGeometry(0.65, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  beacon.position.set(0, 34 + spireH + 5.2, 0);
+  bridgeGroup.add(beacon);
+
+  const cableCount = 20;
+  for (let i = 0; i < cableCount; i++) {
+    const f = i / (cableCount - 1);
+    const towerY = 38 + f * 26;
+    const deckZ  = -55 + f * 110;
+
+    const dy = 9.5 - towerY;
+    const dz = deckZ;
+    const len = Math.sqrt(dy * dy + dz * dz);
+
+    const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, len, 5), goldCableMat);
+    cable.position.set(0, (towerY + 9.5) * 0.5, deckZ * 0.5);
+
+    const angleX = Math.atan2(dz, -dy);
+    cable.rotation.x = angleX;
+    bridgeGroup.add(cable);
+  }
+
+  const deckWidth  = 14;
+  const deckLength = 280;
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(deckLength, 2.2, deckWidth), deckMat);
+  deck.position.set(-60, 9.0, 0);
+  bridgeGroup.add(deck);
+
+  for (let b = 0; b < 28; b++) {
+    const bz = -deckLength * 0.45 + b * (deckLength * 0.9 / 27);
+    const bead = new THREE.Mesh(new THREE.SphereGeometry(0.24, 6, 6), lightBeadMat);
+    bead.position.set(bz - 60, 10.6, -deckWidth * 0.48);
+    bridgeGroup.add(bead);
+  }
+
+  const bridgeGlow = new THREE.PointLight(0xffb300, 3.2, 95, 1.4);
+  bridgeGlow.position.set(-15, 6, 0);
+  bridgeGroup.add(bridgeGlow);
+  candleLights.push(bridgeGlow);
+
+  scene.add(bridgeGroup);
+}
+
+/* ═══════════════════════════════════════════════════
+   ILLUMINATED THAI RIVER CRUISE BOAT (เรือล่องแม่น้ำเจ้าพระยา)
+   Matches the illuminated boat on the midground right in the reference photo!
+════════════════════════════════════════════════════ */
+function buildThaiCruiseBoat() {
+  const g = new THREE.Group();
+  g.position.set(11.5, 0.12, -36);
+  g.rotation.y = 0.28;
+
+  const woodMat   = new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.65, metalness: 0.1 });
+  const whiteMat  = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.5 });
+  const roofGold  = new THREE.MeshStandardMaterial({
+    color: 0xffc107, emissive: 0xb8860b, emissiveIntensity: 1.2, metalness: 0.75, roughness: 0.25
+  });
+  const ledGold   = new THREE.MeshStandardMaterial({
+    color: 0xffe082, emissive: 0xffa000, emissiveIntensity: 4.0, transparent: true, opacity: 0.95
+  });
+  const ledPink   = new THREE.MeshStandardMaterial({
+    color: 0xff80ab, emissive: 0xff4081, emissiveIntensity: 4.0, transparent: true, opacity: 0.95
+  });
+  const ledCyan   = new THREE.MeshStandardMaterial({
+    color: 0x80deea, emissive: 0x00e5ff, emissiveIntensity: 4.0, transparent: true, opacity: 0.95
+  });
+
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(4.4, 1.3, 14.0), woodMat);
+  hull.position.y = 0.65;
+  hull.castShadow = true;
+  g.add(hull);
+
+  const bow = new THREE.Mesh(new THREE.ConeGeometry(2.2, 3.2, 4), woodMat);
+  bow.rotation.x = Math.PI / 2;
+  bow.rotation.y = Math.PI / 4;
+  bow.position.set(0, 0.65, -8.0);
+  g.add(bow);
+
+  const stern = new THREE.Mesh(new THREE.ConeGeometry(2.2, 2.0, 4), woodMat);
+  stern.rotation.x = -Math.PI / 2;
+  stern.rotation.y = Math.PI / 4;
+  stern.position.set(0, 0.65, 7.8);
+  g.add(stern);
+
+  const deckWall = new THREE.Mesh(new THREE.BoxGeometry(3.8, 1.4, 10.5), whiteMat);
+  deckWall.position.y = 1.9;
+  g.add(deckWall);
+
+  for (let p = -4; p <= 4; p += 2) {
+    const postL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.6, 6), woodMat);
+    postL.position.set(-1.8, 1.9, p);
+    g.add(postL);
+
+    const postR = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.6, 6), woodMat);
+    postR.position.set(1.8, 1.9, p);
+    g.add(postR);
+  }
+
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.8, 1.6, 4), roofGold);
+  roof.scale.set(1.0, 0.8, 3.4);
+  roof.rotation.y = Math.PI / 4;
+  roof.position.y = 3.2;
+  roof.castShadow = true;
+  g.add(roof);
+
+  const chofahFront = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.9, 5), roofGold);
+  chofahFront.position.set(0, 3.8, -6.0);
+  chofahFront.rotation.x = -0.4;
+  g.add(chofahFront);
+
+  const chofahBack = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.9, 5), roofGold);
+  chofahBack.position.set(0, 3.8, 6.0);
+  chofahBack.rotation.x = 0.4;
+  g.add(chofahBack);
+
+  const eaveLightColors = [ledGold, ledPink, ledCyan, ledGold];
+  for (let i = 0; i < 22; i++) {
+    const z = -6.0 + i * (12.0 / 21);
+    const matL = eaveLightColors[i % eaveLightColors.length];
+    const bL = new THREE.Mesh(new THREE.SphereGeometry(0.10, 6, 6), matL);
+    bL.position.set(-2.1, 2.7, z);
+    g.add(bL);
+
+    const bR = new THREE.Mesh(new THREE.SphereGeometry(0.10, 6, 6), matL);
+    bR.position.set(2.1, 2.7, z);
+    g.add(bR);
+  }
+
+  for (let i = 0; i < 16; i++) {
+    const z = -6.5 + i * (13.0 / 15);
+    const bL = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), ledGold);
+    bL.position.set(-2.25, 1.25, z);
+    g.add(bL);
+
+    const bR = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), ledGold);
+    bR.position.set(2.25, 1.25, z);
+    g.add(bR);
+  }
+
+  const cabinLight = new THREE.PointLight(0xffa726, 3.2, 22, 1.4);
+  cabinLight.position.set(0, 2.1, 0);
+  g.add(cabinLight);
+  candleLights.push(cabinLight);
+
+  scene.add(g);
+  cruiseBoat = g;
+}
+
+/* ═══════════════════════════════════════════════════
+   DRIFTING KRATHONG FIELD (สายธารกระทงส่องแสงนับสิบในแม่น้ำ)
+   Creates the magical field of dozens of glowing floating krathongs
+════════════════════════════════════════════════════ */
+function buildDriftingKrathongField() {
+  const count = 42;
+  const leafMat   = new THREE.MeshStandardMaterial({ color: 0x225514, roughness: 0.7 });
+  const flowerMat = new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0xdd6600, emissiveIntensity: 0.6 });
+  const flameMat  = new THREE.MeshStandardMaterial({
+    color: 0xffbb00, emissive: 0xff4400, emissiveIntensity: 5.5, transparent: true, opacity: 0.95
+  });
+
+  for (let i = 0; i < count; i++) {
+    const kg = new THREE.Group();
+
+    const x = -2.5 + Math.random() * 18.0;
+    const z = 2.0 - Math.random() * 95.0;
+    const sc = 0.38 + Math.random() * 0.45;
+
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.40, 0.12, 10), leafMat);
+    base.position.y = 0.06;
+    kg.add(base);
+
+    for (let p = 0; p < 8; p++) {
+      const pa = (p / 8) * Math.PI * 2;
+      const petal = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.22, 4), leafMat);
+      petal.position.set(Math.cos(pa) * 0.38, 0.12, Math.sin(pa) * 0.38);
+      petal.rotation.set(0.3, pa, 0);
+      kg.add(petal);
+    }
+
+    const flowers = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 6), flowerMat);
+    flowers.scale.set(1.4, 0.6, 1.4);
+    flowers.position.y = 0.16;
+    kg.add(flowers);
+
+    const candle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.025, 0.24, 6),
+      new THREE.MeshStandardMaterial({ color: 0xfff9c4 })
+    );
+    candle.position.y = 0.28;
+    kg.add(candle);
+
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.15, 6), flameMat);
+    flame.position.y = 0.46;
+    kg.add(flame);
+
+    const kl = new THREE.PointLight(0xffa726, 1.2 + Math.random() * 0.8, 7.5, 2);
+    kl.position.y = 0.50;
+    kg.add(kl);
+    candleLights.push(kl);
+
+    kg.position.set(x, 0.08, z);
+    kg.scale.setScalar(sc);
+    scene.add(kg);
+
+    driftingKrathongs.push({
+      mesh: kg,
+      flame: flame,
+      speed: 0.8 + Math.random() * 1.4,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   KRATHONG builder  — reusable
+════════════════════════════════════════════════════ */
+function makeKrathong(pos) {
+  const g = new THREE.Group();
+
+  const leafM   = new THREE.MeshStandardMaterial({ color: 0x2a6618, roughness: 0.75, metalness: 0, side: THREE.DoubleSide });
+  const leafDkM = new THREE.MeshStandardMaterial({ color: 0x1a4a0c, roughness: 0.75, metalness: 0 });
+  const goldM   = new THREE.MeshStandardMaterial({ color: 0xd4a017, emissive: 0x8b6000, emissiveIntensity: 0.5, metalness: 0.75, roughness: 0.25 });
+  const flMat1  = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0xcc2200, emissiveIntensity: 0.6, roughness: 0.5 });
+  const flMat2  = new THREE.MeshStandardMaterial({ color: 0xffcc00, emissive: 0xcc8800, emissiveIntensity: 0.5, roughness: 0.5 });
+  const flMat3  = new THREE.MeshStandardMaterial({ color: 0xff3366, emissive: 0xcc0044, emissiveIntensity: 0.4, roughness: 0.5 });
+  const candleM = new THREE.MeshStandardMaterial({ color: 0xfff8e1, roughness: 0.9 });
+  const flameM  = new THREE.MeshStandardMaterial({ color: 0xffbb00, emissive: 0xff5500, emissiveIntensity: 6, transparent: true, opacity: 0.9 });
+  const stickM  = new THREE.MeshStandardMaterial({ color: 0x1a0f00, roughness: 1 });
+
+  // Base disc
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.2, 0.35, 16), leafM);
+  base.castShadow = true; g.add(base);
+
+  // Folded leaf points around rim (12 petals)
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    const petal = new THREE.Mesh(new THREE.ConeGeometry(0.44, 0.85, 5), (i%2===0) ? leafM : leafDkM);
+    petal.position.set(Math.cos(a)*1.15, 0.38, Math.sin(a)*1.15);
+    petal.rotation.set(Math.PI*0.22, a, 0);
+    petal.castShadow = true;
+    g.add(petal);
+  }
+
+  // Gold border ring
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.07, 6, 24), goldM);
+  ring.rotation.x = Math.PI/2; ring.position.y = 0.22;
+  g.add(ring);
+
+  // Flowers cluster (marigold + lotus style)
+  const flDefs = [
+    [0.65, 0.5, 0,    flMat1], [-0.65, 0.5, 0,   flMat2],
+    [0,    0.5, 0.65, flMat3], [0,     0.5,-0.65, flMat1],
+    [0.46, 0.5, 0.46, flMat2], [-0.46, 0.5, 0.46,flMat3]
+  ];
+  flDefs.forEach(([fx, fy, fz, fm]) => {
+    for (let p = 0; p < 7; p++) {
+      const pa = (p/7)*Math.PI*2;
+      const petal = new THREE.Mesh(new THREE.SphereGeometry(0.11, 6, 6), fm);
+      petal.scale.set(1, 0.45, 1.8);
+      petal.position.set(fx+Math.cos(pa)*0.13, fy, fz+Math.sin(pa)*0.13);
+      petal.rotation.y = pa;
+      g.add(petal);
+    }
+    // Center
+    const ctr = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 6),
+      new THREE.MeshStandardMaterial({ color: 0xffee00, emissive: 0xffaa00, emissiveIntensity: 0.7 }));
+    ctr.position.set(fx, fy+0.06, fz);
+    g.add(ctr);
+  });
+
+  // Incense sticks (3)
+  for (let i = 0; i < 3; i++) {
+    const a = (i/3)*Math.PI*2 + 0.4;
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.1, 5), stickM);
+    stick.position.set(Math.cos(a)*0.3, 0.9, Math.sin(a)*0.3);
+    g.add(stick);
+    // Ember tip glow
+    const ember = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4),
+      new THREE.MeshStandardMaterial({ color: 0xff3300, emissive: 0xff2200, emissiveIntensity: 3 }));
+    ember.position.set(Math.cos(a)*0.3, 1.46, Math.sin(a)*0.3);
+    g.add(ember);
+  }
+
+  // Candle
+  const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.85, 8), candleM);
+  candle.position.set(0, 0.72, 0);
+  g.add(candle);
+
+  // Flame
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.3, 7), flameM);
+  flame.position.set(0, 1.3, 0);
+  g.add(flame);
+
+  // Per-krathong point light
+  const kl = new THREE.PointLight(0xffaa44, 2.5, 14, 2);
+  kl.position.set(0, 1.5, 0);
+  g.add(kl);
+  candleLights.push(kl);
+
+  g.position.copy(pos);
+  g.scale.setScalar(1.15);
+  scene.add(g);
+  return { group: g, flame, kl };
+}
+
+/* ═══════════════════════════════════════════════════
+   HELD KRATHONG  — static (held by character)
+════════════════════════════════════════════════════ */
+function buildHeldKrathong() {
+  const { group } = makeKrathong(new THREE.Vector3(24.2, 4.0, 15.0));
+  group.scale.setScalar(0.52);
+  group.rotation.y = 0.6;
+}
+
+/* ═══════════════════════════════════════════════════
+   SKY LANTERNS  — InstancedMesh + drift shader
+════════════════════════════════════════════════════ */
+function buildLanterns() {
+  const N = 50;
+  // Simple lantern: cylinder + dome top
+  const geo = new THREE.CylinderGeometry(0.55, 0.55, 1.3, 8);
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xff6600, emissive: 0xff4400, emissiveIntensity: 2.8,
+    transparent: true, opacity: 0.82, side: THREE.DoubleSide
+  });
+
+  lanternMesh = new THREE.InstancedMesh(geo, mat, N);
+  lanternMesh.castShadow = false;
+
+  const dummy = new THREE.Object3D();
+  for (let i = 0; i < N; i++) {
+    const d = {
+      x:     (Math.random() - 0.5) * 110,
+      y:     15 + Math.random() * 110,
+      z:     (Math.random() - 0.5) * 90 - 15,
+      speed: 0.012 + Math.random() * 0.028,
+      drift: (Math.random() - 0.5) * 0.25,
+      phase: Math.random() * Math.PI * 2,
+      scale: 0.75 + Math.random() * 0.65
+    };
+    lanternData.push(d);
+    dummy.position.set(d.x, d.y, d.z);
+    dummy.scale.setScalar(d.scale);
+    dummy.updateMatrix();
+    lanternMesh.setMatrixAt(i, dummy.matrix);
+  }
+  lanternMesh.instanceMatrix.needsUpdate = true;
+  scene.add(lanternMesh);
+}
+
+/* ═══════════════════════════════════════════════════
+   POST-PROCESSING
+════════════════════════════════════════════════════ */
+function buildPostFX() {
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  composer.addPass(new UnrealBloomPass(
+    new THREE.Vector2(Math.floor(window.innerWidth / 2), Math.floor(window.innerHeight / 2)), // Half-res bloom runs 4x faster!
+    0.38,   // strength: soft subtle glow
+    0.32,   // radius
+    0.78    // threshold
+  ));
+  composer.addPass(new OutputPass());
+}
+
+/* ═══════════════════════════════════════════════════
+   EVENTS
+════════════════════════════════════════════════════ */
+function bindEvents() {
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // Unlock audio on first interaction
+  document.addEventListener('pointerdown', unlockAudio, { once: true });
+
+  releaseBtn.addEventListener('click', onRelease);
+  wishInput.addEventListener('keydown', e => { if (e.key === 'Enter') onRelease(); });
+
+  // Auto-tour button toggle
+  const tourBtn = document.getElementById('tour-btn');
+  if (tourBtn) {
+    tourBtn.addEventListener('click', () => {
+      controls.autoRotate = !controls.autoRotate;
+      tourBtn.textContent = controls.autoRotate ? '🎥 เลื่อนชมวิว: เปิด' : '⏸️ เลื่อนชมวิว: ปิด';
+      tourBtn.style.color = controls.autoRotate ? '#ffe082' : '#aaaaaa';
+      tourBtn.style.borderColor = controls.autoRotate ? 'rgba(255,170,68,0.6)' : 'rgba(255,255,255,0.25)';
+    });
+  }
+
+  // Keyboard navigation for panning (W/A/S/D and Arrow Keys)
+  window.addEventListener('keydown', e => {
+    if (document.activeElement === wishInput) return;
+    activeKeys[e.code] = true;
+  });
+  window.addEventListener('keyup', e => {
+    activeKeys[e.code] = false;
+  });
+}
+
+/* ───────────────────────────────────────────────────
+   RELEASE KRATHONG
+─────────────────────────────────────────────────── */
+let releasing = false;
+function onRelease() {
+  if (releasing) return;
+  releasing = true;
+  releaseBtn.disabled = true;
+  unlockAudio();
+
+  const wish = wishInput.value.trim() || 'ขอให้มีความสุข';
+  wishInput.value = '';
+
+  // Spawn at river steps edge (ท่าน้ำริมแม่น้ำ)
+  const startX = -3.8 + (Math.random() - 0.5) * 0.8;
+  const startZ = -0.5 + (Math.random() - 0.5) * 2.0;
+  const { group, flame, kl } = makeKrathong(new THREE.Vector3(startX, 0.12, startZ));
+
+  floatingK.push({
+    group, flame, kl,
+    vel: new THREE.Vector3(
+      0.016 + Math.random() * 0.014,
+      0,
+      -(0.045 + Math.random() * 0.025)
+    ),
+    phase: Math.random() * Math.PI * 2
+  });
+
+  krathongReleased++;
+  cntEl.textContent = krathongReleased;
+
+  // Splash
+  setTimeout(() => playSplash(), 350);
+  showWish(wish);
+  setTimeout(releaseBurstLanterns, 900);
+  setTimeout(() => { spawnFirework(); playFirework(); }, 2200 + Math.random() * 1800);
+  setTimeout(() => { releasing = false; releaseBtn.disabled = false; }, 2800);
+}
+
+/* ───────────────────────────────────────────────────
+   SHOW FLOATING WISH TEXT
+─────────────────────────────────────────────────── */
+function showWish(text) {
+  const el = document.createElement('div');
+  el.className = 'wish-float';
+  el.textContent = '🙏 ' + text;
+  el.style.left   = (38 + Math.random() * 24) + '%';
+  el.style.bottom = '185px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 5000);
+}
+
+/* ───────────────────────────────────────────────────
+   BURST LANTERNS  — spawn low, let them rise
+─────────────────────────────────────────────────── */
+function releaseBurstLanterns() {
+  for (let i = 0; i < 6; i++) {
+    setTimeout(() => {
+      const idx = Math.floor(Math.random() * lanternData.length);
+      lanternData[idx].y = 3 + Math.random() * 8;
+      lanternData[idx].x = (Math.random() - 0.5) * 60;
+      lanternData[idx].z = (Math.random() - 0.5) * 40;
+    }, i * 180);
+  }
+}
+
+/* ───────────────────────────────────────────────────
+   FIREWORK PARTICLES
+─────────────────────────────────────────────────── */
+function spawnFirework() {
+  const N   = 100;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N * 3);
+  const col = new Float32Array(N * 3);
+
+  const cx = (Math.random() - 0.5) * 80;
+  const cy = 55 + Math.random() * 50;
+  const cz = -40 + (Math.random() - 0.5) * 50;
+  const palettes = [
+    [1, .55, 0], [1, .2, .2], [1, 1, 0], [0.9, 0.3, 1], [0.2, 0.9, 1], [1, 0.4, 0.8]
+  ];
+  const c = palettes[Math.floor(Math.random() * palettes.length)];
+
+  for (let i = 0; i < N; i++) {
+    const θ = Math.random() * Math.PI * 2;
+    const φ = Math.acos(2 * Math.random() - 1);
+    const r = Math.random() * 18;
+    pos[i*3]   = cx + r * Math.sin(φ) * Math.cos(θ);
+    pos[i*3+1] = cy + r * Math.cos(φ) * (0.6 + Math.random() * 0.4);
+    pos[i*3+2] = cz + r * Math.sin(φ) * Math.sin(θ);
+    col[i*3] = c[0]; col[i*3+1] = c[1]; col[i*3+2] = c[2];
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.9, vertexColors: true,
+    transparent: true, opacity: 1,
+    depthWrite: false, blending: THREE.AdditiveBlending
+  });
+  const pts = new THREE.Points(geo, mat);
+  scene.add(pts);
+
+  // Flash
+  flashEl.style.opacity = '1';
+  setTimeout(() => { flashEl.style.opacity = '0'; }, 120);
+
+  // Fade out sparks
+  let alpha = 1;
+  const tid = setInterval(() => {
+    alpha -= 0.04;
+    mat.opacity = Math.max(0, alpha);
+    if (alpha <= 0) {
+      clearInterval(tid);
+      scene.remove(pts);
+      geo.dispose(); mat.dispose();
+    }
+  }, 60);
+
+  // Flash light
+  const fl = new THREE.PointLight(new THREE.Color(...c), 15, 90, 2);
+  fl.position.set(cx, cy, cz);
+  scene.add(fl);
+  setTimeout(() => { scene.remove(fl); }, 800);
+}
+
+/* ═══════════════════════════════════════════════════
+   AUDIO  — Web Audio API (procedural)
+════════════════════════════════════════════════════ */
+function unlockAudio() {
+  if (audioReady) return;
+  audioReady = true;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  startWaterLoop();
+  scheduleRandomFireworks();
+}
+
+function startWaterLoop() {
+  if (!audioCtx) return;
+  const sr  = audioCtx.sampleRate;
+  const buf = audioCtx.createBuffer(1, sr * 4, sr);
+  const d   = buf.getChannelData(0);
+  // Pink noise
+  let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+  for (let i = 0; i < d.length; i++) {
+    const w = Math.random() * 2 - 1;
+    b0 = 0.99886*b0 + w*0.0555179; b1 = 0.99332*b1 + w*0.0750759;
+    b2 = 0.96900*b2 + w*0.1538520; b3 = 0.86650*b3 + w*0.3104856;
+    b4 = 0.55000*b4 + w*0.5329522; b5 = -0.7616*b5 - w*0.0168980;
+    d[i] = (b0+b1+b2+b3+b4+b5+b6+w*0.5362) * 0.11;
+    b6 = w * 0.115926;
+  }
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf; src.loop = true;
+  const lp  = audioCtx.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 700; lp.Q.value = 0.5;
+  const gain = audioCtx.createGain(); gain.gain.value = 0.07;
+  src.connect(lp); lp.connect(gain); gain.connect(audioCtx.destination);
+  src.start();
+}
+
+function playSplash() {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const g   = audioCtx.createGain();
+  const f   = audioCtx.createBiquadFilter();
+  f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 0.6;
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(500, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.45);
+  g.gain.setValueAtTime(0.35, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
+  osc.connect(f); f.connect(g); g.connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+}
+
+function playFirework() {
+  if (!audioCtx) return;
+  const sr = audioCtx.sampleRate;
+  const buf = audioCtx.createBuffer(1, sr * 0.6, sr);
+  const d   = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) {
+    d[i] = (Math.random()*2-1) * Math.pow(1 - i/d.length, 1.5);
+  }
+  const src  = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(0.65, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.6);
+  src.connect(gain); gain.connect(audioCtx.destination);
+  src.start();
+}
+
+function scheduleRandomFireworks() {
+  const fire = () => {
+    if (!audioReady) return;
+    spawnFirework(); playFirework();
+    setTimeout(fire, 12000 + Math.random() * 20000);
+  };
+  setTimeout(fire, 8000 + Math.random() * 10000);
+}
+
+/* ═══════════════════════════════════════════════════
+   ANIMATION LOOP
+════════════════════════════════════════════════════ */
+function loop() {
+  requestAnimationFrame(loop);
+  const dt  = clock.getDelta();
+  const t   = clock.getElapsedTime();
+
+  // Smooth keyboard panning (W/A/S/D or Arrow keys)
+  const panSpeed = 16.0 * dt;
+  if (activeKeys['KeyW'] || activeKeys['ArrowUp']) {
+    camera.position.z -= panSpeed;
+    controls.target.z -= panSpeed;
+  }
+  if (activeKeys['KeyS'] || activeKeys['ArrowDown']) {
+    camera.position.z += panSpeed;
+    controls.target.z += panSpeed;
+  }
+  if (activeKeys['KeyA'] || activeKeys['ArrowLeft']) {
+    camera.position.x -= panSpeed;
+    controls.target.x -= panSpeed;
+  }
+  if (activeKeys['KeyD'] || activeKeys['ArrowRight']) {
+    camera.position.x += panSpeed;
+    controls.target.x += panSpeed;
+  }
+
+  // Water current flow speed
+  if (!waterFallback && water?.material?.uniforms?.['time']) {
+    water.material.uniforms['time'].value += dt * 0.72;
+  }
+
+  // Stars
+  if (starMat) starMat.uniforms.uTime.value = t;
+
+  // Lightweight flicker every 2nd frame
+  if (Math.floor(t * 30) % 2 === 0) {
+    candleLights.forEach((cl, i) => {
+      cl.intensity = 2.0 + Math.sin(t * 10 + i * 1.7) * 0.35;
+    });
+  }
+
+  // Animate sky lanterns
+  const dummy = new THREE.Object3D();
+  lanternData.forEach((d, i) => {
+    d.y += d.speed;
+    d.x += Math.sin(t * 0.4 + d.phase) * 0.018;
+    if (d.y > 220) {
+      d.y = 3 + Math.random() * 8;
+      d.x = (Math.random() - 0.5) * 100;
+      d.z = (Math.random() - 0.5) * 80 - 15;
+    }
+    dummy.position.set(d.x, d.y, d.z);
+    dummy.scale.setScalar(d.scale);
+    dummy.rotation.y = t * 0.25 + d.phase;
+    dummy.updateMatrix();
+    lanternMesh.setMatrixAt(i, dummy.matrix);
+  });
+  lanternMesh.instanceMatrix.needsUpdate = true;
+
+  // ── Animate Walking NPCs (Procedural Walk Cycle) ──
+  walkingNPCs.forEach(npc => {
+    // 1. Move position along promenade path
+    npc.root.position.z += npc.dir * npc.speed * dt;
+
+    // Check path limits and reverse smoothly
+    if (npc.dir > 0 && npc.root.position.z >= npc.maxZ) {
+      npc.dir = -1;
+      npc.root.rotation.y = Math.PI; // Turn around to face other direction
+    } else if (npc.dir < 0 && npc.root.position.z <= npc.minZ) {
+      npc.dir = 1;
+      npc.root.rotation.y = 0;       // Face forward
+    }
+
+    // 2. Procedural Walk Cycle Math
+    const cycleTime = t * npc.strideRate + npc.phaseOffset;
+
+    // Pelvis vertical step bounce (bounces twice per stride) & subtle hip sway
+    npc.hips.position.y = (0.95 + Math.abs(Math.sin(cycleTime * 2)) * 0.05) * npc.scale;
+    npc.hips.rotation.z = Math.cos(cycleTime) * 0.04;
+    npc.hips.rotation.y = Math.sin(cycleTime) * 0.03;
+
+    // Legs swing forward and backward in anti-phase
+    const legAngle = Math.sin(cycleTime) * 0.58;
+    npc.leftLeg.rotation.x = legAngle;
+    npc.rightLeg.rotation.x = -legAngle;
+
+    // Knee bends during the upward/backward swing to lift foot naturally
+    npc.leftCalf.rotation.x = Math.max(0, -Math.sin(cycleTime)) * 0.75;
+    npc.rightCalf.rotation.x = Math.max(0, Math.sin(cycleTime)) * 0.75;
+
+    // Arms swing in opposition to legs for natural human counter-balance
+    npc.leftArm.rotation.x = -legAngle * 0.65;
+    npc.rightArm.rotation.x = legAngle * 0.65;
+
+    // Head subtle bob
+    npc.head.rotation.x = Math.sin(cycleTime * 2) * 0.03;
+  });
+
+  // ── Animate Stall Vendors ──
+  stallAnimators.forEach(sa => {
+    if (sa.type === 'fanning') {
+      sa.mesh.rotation.y = -Math.PI / 2 + Math.sin(t * 3.5) * 0.08;
+    } else if (sa.type === 'stirring') {
+      sa.mesh.rotation.y = -Math.PI / 2 + Math.sin(t * 2.8) * 0.06;
+    }
+  });
+
+  // ── Animate Hero Master Krathong (Bobbing & Flame Dance) ──
+  if (heroKrathong) {
+    heroKrathong.position.y = 0.08 + Math.sin(t * 1.7) * 0.018;
+    heroKrathong.rotation.z = Math.sin(t * 0.9) * 0.022;
+    heroKrathong.rotation.x = Math.sin(t * 1.2) * 0.015;
+  }
+  if (heroFlame) {
+    const f = 1 + Math.sin(t * 15) * 0.14;
+    heroFlame.scale.set(f * 0.92, 1 + Math.sin(t * 12) * 0.18, f * 0.92);
+  }
+
+  // ── Animate Thai River Cruise Boat (Cruising smoothly downstream) ──
+  if (cruiseBoat) {
+    cruiseBoat.position.z -= 1.8 * dt; // Gliding down the Chao Phraya river
+    if (cruiseBoat.position.z < -105) {
+      cruiseBoat.position.z = 25; // Loop back from upstream
+    }
+    cruiseBoat.position.y = 0.12 + Math.sin(t * 0.8) * 0.035;
+    cruiseBoat.rotation.z = Math.sin(t * 0.6) * 0.012;
+    cruiseBoat.rotation.x = Math.sin(t * 0.7) * 0.010;
+  }
+
+  // ── Animate Drifting Krathongs Field ──
+  driftingKrathongs.forEach(dk => {
+    dk.mesh.position.z -= dk.speed * dt;
+    dk.mesh.position.x += Math.sin(t * 0.6 + dk.phase) * 0.006;
+    dk.mesh.position.y = 0.08 + Math.sin(t * 1.6 + dk.phase) * 0.016;
+    dk.mesh.rotation.y += 0.003;
+    if (dk.flame) {
+      const f = 1 + Math.sin(t * 13 + dk.phase) * 0.15;
+      dk.flame.scale.set(f, 1 + Math.sin(t * 10 + dk.phase) * 0.2, f);
+    }
+    if (dk.mesh.position.z < -120) {
+      dk.mesh.position.z = 2.0 + Math.random() * 8.0;
+      dk.mesh.position.x = -2.5 + Math.random() * 18.0;
+    }
+  });
+
+  // Animate user released floating krathongs
+  for (let i = floatingK.length - 1; i >= 0; i--) {
+    const k = floatingK[i];
+    k.group.position.x += k.vel.x;
+    k.group.position.z += k.vel.z;
+    k.phase += dt * 1.8;
+    k.group.position.y = 0.12 + Math.sin(k.phase) * 0.04;
+    k.group.rotation.y += 0.004;
+    k.group.rotation.z = Math.sin(k.phase * 0.65) * 0.055;
+    k.group.rotation.x = Math.sin(k.phase * 0.45) * 0.03;
+    // Flame dance
+    if (k.flame) {
+      const f = 1 + Math.sin(t * 14 + i) * 0.12;
+      k.flame.scale.set(f * 0.9, 1 + Math.sin(t * 11 + i) * 0.18, f * 0.9);
+    }
+    // Remove far krathongs
+    const p = k.group.position;
+    if (p.z < -300 || Math.abs(p.x) > 300) {
+      scene.remove(k.group);
+      candleLights.splice(candleLights.indexOf(k.kl), 1);
+      floatingK.splice(i, 1);
+    }
+  }
+
+  controls.update();
+  composer.render();
+}
+
+/* ═══════════════════════════════════════════════════
+   BOOT
+════════════════════════════════════════════════════ */
+init().catch(err => {
+  console.error('[LoyKrathong]', err);
+  document.querySelector('.ld-hint').textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+});
+</script>
+</body>
+</html>
